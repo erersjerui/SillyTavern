@@ -442,7 +442,105 @@ const default_settings = {
     extensions: {},
 };
 
+<<<<<<< Updated upstream
 const oai_settings = structuredClone(default_settings);
+=======
+const oai_settings = {
+    preset_settings_openai: 'Default',
+    temp_openai: 1.0,
+    freq_pen_openai: 0,
+    pres_pen_openai: 0,
+    top_p_openai: 1.0,
+    top_k_openai: 0,
+    min_p_openai: 0,
+    top_a_openai: 0,
+    repetition_penalty_openai: 1,
+    stream_openai: false,
+    openai_max_context: max_4k,
+    openai_max_tokens: 300,
+    wrap_in_quotes: false,
+    ...chatCompletionDefaultPrompts,
+    ...promptManagerDefaultPromptOrders,
+    send_if_empty: '',
+    impersonation_prompt: default_impersonation_prompt,
+    new_chat_prompt: default_new_chat_prompt,
+    new_group_chat_prompt: default_new_group_chat_prompt,
+    new_example_chat_prompt: default_new_example_chat_prompt,
+    continue_nudge_prompt: default_continue_nudge_prompt,
+    bias_preset_selected: default_bias,
+    bias_presets: default_bias_presets,
+    wi_format: default_wi_format,
+    group_nudge_prompt: default_group_nudge_prompt,
+    scenario_format: default_scenario_format,
+    personality_format: default_personality_format,
+    openai_model: 'gpt-4-turbo',
+    claude_model: 'claude-3-5-sonnet-20240620',
+    google_model: 'gemini-1.5-pro',
+    vertexai_model: 'gemini-2.0-flash-001',
+    ai21_model: 'jamba-large',
+    mistralai_model: 'mistral-large-latest',
+    cohere_model: 'command-r-plus',
+    perplexity_model: 'sonar-pro',
+    groq_model: 'llama-3.1-70b-versatile',
+    electronhub_model: 'gpt-4o-mini',
+    electronhub_sort_models: 'alphabetically',
+    electronhub_group_models: false,
+    nanogpt_model: 'gpt-4o-mini',
+    deepseek_model: 'deepseek-chat',
+    aimlapi_model: 'gpt-4-turbo',
+    xai_model: 'grok-3-beta',
+    pollinations_model: 'openai',
+    cometapi_model: 'gpt-4o',
+    moonshot_model: 'kimi-latest',
+    fireworks_model: 'accounts/fireworks/models/kimi-k2-instruct',
+    azure_base_url: '',
+    azure_deployment_name: '',
+    azure_api_version: '2024-02-15-preview',
+    azure_openai_model: '',
+    custom_model: '',
+    custom_url: '',
+    custom_include_body: '',
+    custom_exclude_body: '',
+    custom_include_headers: '',
+    openrouter_model: openrouter_website_model,
+    openrouter_use_fallback: false,
+    openrouter_group_models: false,
+    openrouter_sort_models: 'alphabetically',
+    openrouter_providers: [],
+    openrouter_allow_fallbacks: true,
+    openrouter_middleout: openrouter_middleout_types.ON,
+    reverse_proxy: '',
+    chat_completion_source: chat_completion_sources.OPENAI,
+    max_context_unlocked: false,
+    show_external_models: false,
+    proxy_password: '',
+    assistant_prefill: '',
+    assistant_impersonation: '',
+    claude_use_sysprompt: false,
+    use_makersuite_sysprompt: true,
+    vertexai_auth_mode: 'express',
+    vertexai_region: 'us-central1',
+    vertexai_express_project_id: '',
+    squash_system_messages: false,
+    image_inlining: false,
+    inline_image_quality: 'low',
+    video_inlining: false,
+    bypass_status_check: false,
+    continue_prefill: false,
+    function_calling: false,
+    names_behavior: character_names_behavior.DEFAULT,
+    continue_postfix: continue_postfix_types.SPACE,
+    custom_prompt_post_processing: custom_prompt_post_processing_types.NONE,
+    show_thoughts: true,
+    reasoning_effort: reasoning_effort_types.auto,
+    enable_web_search: false,
+    request_images: false,
+    seed: -1,
+    n: 1,
+    bind_preset_to_connection: true,
+    extensions: {},
+};
+>>>>>>> Stashed changes
 
 export let proxies = [
     {
@@ -1832,7 +1930,7 @@ function saveModelList(data) {
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.MAKERSUITE) {
-        // Clear only the "Other" optgroup for dynamic models
+    // Clear only the "Other" optgroup for dynamic models
         $('#google_other_models').empty();
 
         // Get static model options that are already in the HTML
@@ -1843,7 +1941,7 @@ function saveModelList(data) {
 
         // Add dynamic models to the "Other" group
         model_list.forEach((model) => {
-            // Only add if not already in static list
+        // Only add if not already in static list
             if (!staticModels.includes(model.id)) {
                 $('#google_other_models').append(
                     $('<option>', {
