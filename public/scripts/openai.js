@@ -15,6 +15,8 @@ import {
     Generate,
     getExtensionPrompt,
     getExtensionPromptMaxDepth,
+    getMediaDisplay,
+    getMediaIndex,
     getRequestHeaders,
     getStoppingStrings,
     is_send_press,
@@ -74,7 +76,7 @@ import { callGenericPopup, Popup, POPUP_RESULT, POPUP_TYPE } from './popup.js';
 import { t } from './i18n.js';
 import { ToolManager } from './tool-calling.js';
 import { accountStorage } from './util/AccountStorage.js';
-import { COMETAPI_IGNORE_PATTERNS, IGNORE_SYMBOL } from './constants.js';
+import { COMETAPI_IGNORE_PATTERNS, IGNORE_SYMBOL, MEDIA_DISPLAY, MEDIA_TYPE } from './constants.js';
 
 export {
     openai_messages_count,
@@ -637,10 +639,11 @@ function setOpenAIMessages(chat) {
         // Apply the "wrap in quotes" option
         if (role == 'user' && oai_settings.wrap_in_quotes) content = `"${content}"`;
         const name = chat[j]['name'];
-        const image = chat[j]?.extra?.image;
-        const video = chat[j]?.extra?.video;
+        const media = chat[j]?.extra?.media;
+        const mediaDisplay = getMediaDisplay(chat[j]);
+        const mediaIndex = getMediaIndex(chat[j]);
         const invocations = chat[j]?.extra?.tool_invocations;
-        messages[i] = { 'role': role, 'content': content, name: name, 'image': image, 'video': video, 'invocations': invocations };
+        messages[i] = { 'role': role, 'content': content, name: name, 'media': media, 'mediaDisplay': mediaDisplay, 'mediaIndex': mediaIndex, 'invocations': invocations };
         j++;
     }
 
@@ -950,12 +953,35 @@ async function populateChatHistory(messages, prompts, chatCompletion, type = nul
             await chatMessage.setName(messageName);
         }
 
-        if (imageInlining && chatPrompt.image) {
-            await chatMessage.addImage(chatPrompt.image);
+        /**
+         * Inline a media attachment into the chat message.
+         * @param {MediaAttachment} media - The media attachment to inline.
+         */
+        async function inlineMediaAttachment(media) {
+            if (!media || !media.url) {
+                return;
+            }
+            if (!media.type) {
+                media.type = MEDIA_TYPE.IMAGE;
+            }
+            if (imageInlining && media.type === MEDIA_TYPE.IMAGE) {
+                await chatMessage.addImage(media.url);
+            }
+            if (videoInlining && media.type === MEDIA_TYPE.VIDEO) {
+                await chatMessage.addVideo(media.url);
+            }
         }
 
-        if (videoInlining && chatPrompt.video) {
-            await chatMessage.addVideo(chatPrompt.video);
+        if (Array.isArray(chatPrompt.media) && chatPrompt.media.length) {
+            if (chatPrompt.mediaDisplay === MEDIA_DISPLAY.LIST) {
+                for (const media of chatPrompt.media) {
+                    await inlineMediaAttachment(media);
+                }
+            }
+            if (chatPrompt.mediaDisplay === MEDIA_DISPLAY.GALLERY) {
+                const media = chatPrompt.media[chatPrompt.mediaIndex];
+                await inlineMediaAttachment(media);
+            }
         }
 
         if (canUseTools && Array.isArray(chatPrompt.invocations)) {
@@ -2605,7 +2631,7 @@ async function sendOpenAIRequest(type, messages, signal, { jsonSchema = null } =
             let text = '';
             const swipes = [];
             const toolCalls = [];
-            const state = { reasoning: '', image: '' };
+            const state = { reasoning: '', images: [] };
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) return;
@@ -2670,9 +2696,9 @@ export function getStreamingReply(data, state, { chatCompletionSource = null, ov
         }
         return data?.delta?.text || '';
     } else if ([chat_completion_sources.MAKERSUITE, chat_completion_sources.VERTEXAI].includes(chat_completion_source)) {
-        const inlineData = data?.candidates?.[0]?.content?.parts?.find(x => x.inlineData)?.inlineData;
-        if (inlineData) {
-            state.image = `data:${inlineData.mimeType};base64,${inlineData.data}`;
+        const inlineData = data?.candidates?.[0]?.content?.parts?.filter(x => x.inlineData)?.map(x => x.inlineData) || [];
+        if (Array.isArray(inlineData) && inlineData.length > 0) {
+            state.images.push(...inlineData.map(x => `data:${x.mimeType};base64,${x.data}`).filter(isDataURL));
         }
         if (show_thoughts) {
             state.reasoning += (data?.candidates?.[0]?.content?.parts?.filter(x => x.thought)?.map(x => x.text)?.[0] || '');
@@ -2691,9 +2717,9 @@ export function getStreamingReply(data, state, { chatCompletionSource = null, ov
         }
         return data.choices?.[0]?.delta?.content || '';
     } else if (chat_completion_source === chat_completion_sources.OPENROUTER) {
-        const imageUrl = data?.choices?.[0]?.delta?.images?.find(x => x.type === 'image_url')?.image_url?.url;
-        if (imageUrl) {
-            state.image = imageUrl;
+        const imageUrls = data?.choices?.[0]?.delta?.images?.filter(x => x.type === 'image_url')?.map(x => x?.image_url?.url) || [];
+        if (Array.isArray(imageUrls) && imageUrls.length > 0) {
+            state.images.push(...imageUrls.filter(isDataURL));
         }
         if (show_thoughts) {
             state.reasoning += (data.choices?.filter(x => x?.delta?.reasoning)?.[0]?.delta?.reasoning || '');
@@ -3003,6 +3029,13 @@ class Message {
      */
     async addImage(image) {
         const textContent = this.content;
+        if (!Array.isArray(this.content)) {
+            this.content = [];
+            if (typeof textContent === 'string') {
+                this.content.push({ type: 'text', text: textContent });
+            }
+        }
+
         const isDataUrl = isDataURL(image);
         if (!isDataUrl) {
             try {
@@ -3019,10 +3052,7 @@ class Message {
         image = await this.compressImage(image);
 
         const quality = oai_settings.inline_image_quality || default_settings.inline_image_quality;
-        this.content = [
-            { type: 'text', text: textContent },
-            { type: 'image_url', image_url: { 'url': image, 'detail': quality } },
-        ];
+        this.content.push({ type: 'image_url', image_url: { 'url': image, 'detail': quality } });
 
         try {
             const tokens = await this.getImageTokenCost(image, quality);
@@ -3033,8 +3063,20 @@ class Message {
         }
     }
 
+    /**
+     * Adds a video to the message.
+     * @param {string} video Video URL or Data URL.
+     * @returns {Promise<void>}
+     */
     async addVideo(video) {
         const textContent = this.content;
+        if (!Array.isArray(this.content)) {
+            this.content = [];
+            if (typeof textContent === 'string') {
+                this.content.push({ type: 'text', text: textContent });
+            }
+        }
+
         const isDataUrl = isDataURL(video);
         if (!isDataUrl) {
             try {
@@ -3049,10 +3091,7 @@ class Message {
         }
 
         // Note: No compression for videos (unlike images)
-        this.content = [
-            { type: 'text', text: textContent },
-            { type: 'video_url', video_url: { 'url': video } },
-        ];
+        this.content.push({ type: 'video_url', video_url: { 'url': video } });
 
         try {
             // Convservative estimate for video token cost without knowing duration
