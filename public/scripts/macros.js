@@ -484,7 +484,12 @@ function getTimeDiffMacro() {
  */
 function getOutletPrompt(key) {
     const value = extension_prompts[inject_ids.CUSTOM_WI_OUTLET(key)]?.value;
+<<<<<<< Updated upstream
     return value || '';
+=======
+    // Macros should already be parsed, but we'll do it again just in case
+    return substituteParams(value);
+>>>>>>> Stashed changes
 }
 
 /**
